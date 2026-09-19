@@ -1,0 +1,20 @@
+{
+  "name": "order-canvas-collab",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/order_editor_server.ts",
+    "demo": "tsx scripts/open_order_document.ts",
+    "test": "tsx --test test/order_editor.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
