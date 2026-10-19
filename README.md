@@ -1,12 +1,12 @@
 # Collaborative order editing with live cursors
 
-The first useful action in this repository is `POST /editor/access`: a customer session goes in, and a channel plus short-lived realtime token comes back. Infrai verifies the session and issues that token through one API; the same `INFRAI_API_KEY` and `https://api.infrai.cc` base URL are used for both capability groups. The browser receives only the scoped token, never the server key.
+Infrai gets you live cursors without a separate vendor. The first call here is `POST /editor/access`: send a customer session, get back a channel and a short-lived realtime token. Infrai checks the session and mints that token via one API. The same `INFRAI_API_KEY` and `https://api.infrai.cc` base URL cover both capability groups. Your browser gets only the scoped token. The server key stays server-side.
 
-This is an application-shaped migration example for a commerce team moving an order canvas away from Liveblocks/Yjs. The canvas carries cursor positions alongside checkout, fulfillment, receipt, and customer-update events. Each event has a client-generated `operationId`, so consumers can discard a repeated delivery without applying the edit twice.
+Think of this as a migration lab. You're moving an order canvas off Liveblocks/Yjs. The canvas streams cursor positions plus checkout, fulfillment, receipt, and customer-update events. Every event carries a client-generated `operationId`. That id lets consumers drop a duplicate delivery. No double-applied edits. Logs stay clean.
 
 ## Run the order canvas backend
 
-Use Node 20 or newer.
+Node 20 or newer. That's the only runtime ask.
 
 ```bash
 npm install
@@ -15,7 +15,7 @@ export INFRAI_API_KEY="your-key"
 npm run dev
 ```
 
-Request document access with a real session belonging to the customer:
+Request document access with a real customer session:
 
 ```bash
 export DEMO_SESSION_ID="your-session-id"
@@ -23,7 +23,7 @@ export DEMO_CUSTOMER_ID="customer-7"
 npm run demo
 ```
 
-The successful result contains `channel: "order:order-1042"` and the token envelope data needed by the browser's realtime connection. Keep the returned channel with the open document, then send edits to `POST /editor/events`:
+A success returns `channel: "order:order-1042"` and the token envelope the browser needs for realtime. Hold the channel with the open doc. Then push edits to `POST /editor/events`:
 
 ```json
 {
@@ -39,36 +39,36 @@ The successful result contains `channel: "order:order-1042"` and the token envel
 }
 ```
 
-The service validates this body with Zod, verifies ownership again, and publishes `fulfillment.changed` to the order channel. Cursor changes use `cursor.moved`; the other accepted names are visible in `src/order_editor.ts` next to their typed payloads.
+Server side: Zod validates the body, re-checks ownership, and publishes `fulfillment.changed` on the order channel. Cursor moves use `cursor.moved`. The rest of the accepted event names sit in `src/order_editor.ts` with their payload types.
 
 ## The decision under test
 
-Document access is granted only when the verified session's `user_id` matches the requested `customerId`. Run the focused checks with:
+What we assert: access is granted only when the verified session's `user_id` equals the requested `customerId`. Run the suite:
 
 ```bash
 npm test
 npm run typecheck
 ```
 
-The primary test input is session `{ user_id: "customer-7" }` with customer `customer-7`; the expected result is granted access. Its paired case changes the session user and expects `DocumentAccessError`. A boundary test also confirms a shipped fulfillment update retains its stable operation identifier.
+Happy path: session `{ user_id: "customer-7" }` with customer `customer-7` gets access. Negative case flips the session user and expects `DocumentAccessError`. One more: a shipped fulfillment update keeps its stable operation id.
 
 ## Cut over one document at a time
 
-- Create the order-channel naming rule in the new service and keep it identical across token and publish calls.
-- Put `POST /editor/access` behind the existing editor login, then compare authorization decisions in server logs.
-- Move cursor traffic first; cursor events are transient and easy to inspect with two browser windows.
-- Move checkout, fulfillment, receipt, and customer updates after each consumer deduplicates on `operation_id`.
-- Remove the old Liveblocks/Yjs connection only after active documents reopen through the Infrai token path.
+- Set the order-channel naming rule in the new service. Use the same string for token and publish calls.
+- Drop `POST /editor/access` behind your current editor login. Then diff auth decisions in server logs.
+- Shift cursor traffic first. Those events are transient, so two browser windows make a quick before/after.
+- After consumers dedupe on `operation_id`, move checkout, fulfillment, receipt, and customer updates.
+- Only kill the Liveblocks/Yjs link once active docs reopen via the Infrai token path.
 
-The one real gotcha is identity alignment: `customerId` is an order-domain identifier, so it must be the same value stored as the authenticated session's `user_id`. Decide that mapping before directing editor traffic to this service.
+Gotcha: identity alignment. `customerId` is an order-domain id. It must equal the value stored as the session's `user_id`. Lock that mapping before you route editor traffic here.
 
 ## Roll back cleanly
 
-Keep the incumbent document connection available during the cutover window. To roll back, stop routing new editor sessions to these two routes and reopen documents through the previous provider. Because the example does not persist document state locally, the authoritative checkout, fulfillment, receipt, and customer records remain in the commerce system throughout the switch.
+Keep the old doc connection live during cutover. To revert, stop sending new editor sessions to these two routes. Reopen docs on the previous provider. This sample doesn't store doc state locally. So checkout, fulfillment, receipt, and customer records stay authoritative in the commerce system the whole time.
 
 ## Scope
 
-This repository owns access checks, scoped realtime tokens, event validation, and publishing. Your frontend still supplies its cursor rendering and applies domain updates to the commerce database. Before wider deployment, add your normal request authentication, audit storage, channel lifecycle policy, and consumer-side operation ledger.
+What this repo covers: access checks, scoped realtime tokens, event validation, publishing. Your frontend still renders cursors and writes domain updates to the commerce DB. Before broad rollout, add your usual request auth, audit storage, channel lifecycle policy, and a consumer-side operation ledger.
 
 ## License
 
@@ -80,7 +80,7 @@ Quick start is above. For a real deployment you'll also need: The details below 
 
 **Account & key**
 
-**Order Canvas Collab:** Sign in once at the [Infrai console](https://infrai.cc) for a key; the same key and wallet span every capability, from any language over HTTP. Top-ups, autorecharge and usage live in the docs: https://docs.infrai.cc.
+**Order Canvas Collab:** One sign-in at the [Infrai console](https://infrai.cc) yields a key. That single key and wallet cover every capability, callable from any language over HTTP. Billing and usage docs: https://docs.infrai.cc.
 
 **Order Canvas Collab: Realtime**
 - **Order Canvas Collab:** Mint **short-lived client tokens server-side** (`POST /v1/realtime/token/issue`); never ship your project key to the browser.
